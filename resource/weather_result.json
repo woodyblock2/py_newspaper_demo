@@ -1,0 +1,21 @@
+{
+    "status": "1",
+    "count": "1",
+    "info": "OK",
+    "infocode": "10000",
+    "lives": [
+        {
+            "province": "辽宁",
+            "city": "中山区",
+            "adcode": "210202",
+            "weather": "阴",
+            "temperature": "4",
+            "winddirection": "东北",
+            "windpower": "≤3",
+            "humidity": "25",
+            "reporttime": "2025-03-03 15:32:14",
+            "temperature_float": "4.0",
+            "humidity_float": "25.0"
+        }
+    ]
+}

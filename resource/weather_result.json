@@ -8,14 +8,14 @@
             "province": "辽宁",
             "city": "中山区",
             "adcode": "210202",
-            "weather": "阴",
-            "temperature": "1",
-            "winddirection": "东",
-            "windpower": "≤3",
-            "humidity": "84",
-            "reporttime": "2025-03-04 20:32:11",
-            "temperature_float": "1.0",
-            "humidity_float": "84.0"
+            "weather": "多云",
+            "temperature": "4",
+            "winddirection": "西北",
+            "windpower": "4",
+            "humidity": "52",
+            "reporttime": "2025-03-05 15:32:12",
+            "temperature_float": "4.0",
+            "humidity_float": "52.0"
         }
     ]
 }

@@ -146,63 +146,140 @@ class NewspaperApp:
         self.cam_label.place(x=self.cam_pos_x, y=self.cam_pos_y, width=self.cam_width, height=self.cam_height)
 
         # 定义两个按钮——“拍照”、“退出”
-        self.btn_capture = tk.Button(self.root, text="拍照", command=self.capture_photo)
+        self.btn_capture = tk.Button(self.root, text="拍照", command=self.on_capture)
         self.btn_capture.place(x=400, y=10, width=80, height=30)
 
-        self.btn_exit = tk.Button(self.root, text="退出", command=self.exit_app)
-        self.btn_exit.place(x=500, y=10, width=80, height=30)
+        self.btn_print = tk.Button(self.root, text="打印", command=self.on_print)
+        self.btn_print.place(x=500, y=10, width=80, height=30)
 
+        # 初始时，“打印”按钮禁用
+        self.btn_print["state"] = "disabled"
         # 天气信息（可提前获取并显示）
         self.weather_str = get_weather_info()
         # 这里简单地在窗口标题栏显示天气，可自行修改
         self.root.title(f"今日登报 - 天气：{self.weather_str}")
+
+        # 是否冻结画面
+        self.is_freeze = False
+        # 倒计时秒数，如果大于0则表示正在倒计时
+        self.countdown_value = 0
+
+        # 用于保存拍摄时的画面
+        self.captured_frame = None
 
         # 启动循环更新摄像头画面
         self.update_frame()
 
     def update_frame(self):
         """
-        从摄像头读取一帧，转换后显示到 cam_label 上
+        实时更新摄像头画面 / 处理倒计时逻辑。
         """
-        ret, frame = self.cap.read()
-        if ret:
-            # 转为 RGB 并resize到指定尺寸
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = cv2.resize(frame, (self.cam_width, self.cam_height))
-            # 转为 Pillow 图像
-            img = Image.fromarray(frame)
-            # 转为 Tkinter 可显示的图像
+        # 如果处于冻结状态，不再从摄像头读取新帧，而是一直显示 self.captured_frame
+        if self.is_freeze and self.captured_frame is not None:
+            # 把 captured_frame (BGR->RGB) 转成 Tk
+            frame_rgb = cv2.cvtColor(self.captured_frame, cv2.COLOR_BGR2RGB)
+            frame_rgb = cv2.resize(frame_rgb, (self.cam_width, self.cam_height))
+            img = Image.fromarray(frame_rgb)
             imgtk = ImageTk.PhotoImage(image=img)
-            # 显示到 cam_label
             self.cam_label.imgtk = imgtk
             self.cam_label.configure(image=imgtk)
+        else:
+            # 正常读取摄像头画面
+            ret, frame = self.cap.read()
+            if ret:
+                # 如果在倒计时中，就在画面上叠加倒计时数字
+                if self.countdown_value > 0:
+                    text = str(self.countdown_value)
+                    # 在画面上写倒计时数字（OpenCV方式）
+                    cv2.putText(frame, text, 
+                                (int(self.cam_width/2 - 20), int(self.cam_height/2)), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 
+                                2, (0, 0, 255), 5)
 
-        # after(延迟毫秒数, 函数)——递归调用自己，实现实时刷新
-        self.root.after(30, self.update_frame)
+                # 显示到 cam_label
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_rgb = cv2.resize(frame_rgb, (self.cam_width, self.cam_height))
+                img = Image.fromarray(frame_rgb)
+                imgtk = ImageTk.PhotoImage(image=img)
+                self.cam_label.imgtk = imgtk
+                self.cam_label.configure(image=imgtk)
 
-    def capture_photo(self):
+        # 递归调用自己
+        self.root.after(50, self.update_frame)
+
+    def on_capture(self):
         """
-        拍照函数：保存当前帧为文件，然后调用create_newspaper_image()
+        点击“拍照”按钮：开始 3 秒倒计时。
+        """
+        # # 如果已经在冻结状态，或正在倒计时中，就忽略
+        # if self.is_freeze or self.countdown_value > 0:
+        #     return
+
+        self.is_freeze = False
+
+        # 先将“打印”按钮置为禁用
+        self.btn_print.configure(state="disabled")
+        # 同时“拍照”按钮也禁用
+        self.btn_capture.configure(state="disabled")
+
+        # 设置倒计时起始数值
+        self.countdown_value = 3
+        self.update_countdown()
+
+    def update_countdown(self):
+        """
+        每秒更新一次倒计时显示
+        """
+        if self.countdown_value > 0:
+            self.countdown_value -= 1
+            self.root.after(1000, self.update_countdown)
+        else:
+            # 倒计时结束，执行拍照并冻结画面
+            self.capture_and_freeze()
+
+    def capture_and_freeze(self):
+        """
+        倒计时结束后，拍照并冻结当前画面
         """
         ret, frame = self.cap.read()
         if ret:
-            # 保存当前帧
-            photo_path = "captured.jpg"
-            cv2.imwrite(photo_path, frame)
-            print(f"拍照成功, 保存到 {photo_path}")
-            
-            # 生成报纸图片
-            final_path = create_newspaper_image(photo_path, self.weather_str)
-            print("最终报纸图片：", final_path)
-            # 可以在这里弹窗提示用户，或者直接弹出一个新窗口显示 final_path
+            # 保存当前帧到内存
+            self.captured_frame = frame
+            # 也可以先行保存到文件
+            cv2.imwrite("captured.jpg", frame)
+            print("拍照完成，已保存到 captured.jpg")
 
-    def exit_app(self):
+            # 冻结画面
+            self.is_freeze = True
+
+            # 启用“打印”按钮
+            self.btn_print.configure(state="normal")
+            # 同时“拍照”按钮也启用
+            self.btn_capture.configure(state="normal")
+
+    def on_print(self):
         """
-        退出应用
+        点击“打印”按钮，只有在冻结状态下才可点击。
+        - 生成报纸图
+        - 调用打印或保存
+        - 恢复摄像头动态捕捉
         """
-        if self.cap.isOpened():
-            self.cap.release()
-        self.root.destroy()
+        if not self.is_freeze:
+            return
+
+        # 先把冻结画面保存一下（也可用上面拍照时保存的 captured.jpg）
+        photo_path = "captured.jpg"
+
+        # 调用你的合成报纸图逻辑
+        final_path = create_newspaper_image(photo_path, self.weather_str)
+        print("最终报纸图片：", final_path)
+
+        # TODO：此处可调用打印机逻辑
+        print("正在调用打印机...")
+
+        # 打印后一直处于静止状态
+        # self.is_freeze = False
+        self.btn_print.configure(state="disabled")  # 打印完立刻禁用
 
 
 def main():

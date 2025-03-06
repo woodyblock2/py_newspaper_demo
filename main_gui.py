@@ -176,8 +176,8 @@ class NewspaperApp:
         """
         # 如果处于冻结状态，不再从摄像头读取新帧，而是一直显示 self.captured_frame
         if self.is_freeze and self.captured_frame is not None:
-            # 把 captured_frame (BGR->RGB) 转成 Tk
-            frame_rgb = cv2.cvtColor(self.captured_frame, cv2.COLOR_BGR2RGB)
+            # 镜像处理冻结帧
+            frame_rgb = cv2.cvtColor(cv2.flip(self.captured_frame, 1), cv2.COLOR_BGR2RGB)
             frame_rgb = cv2.resize(frame_rgb, (self.cam_width, self.cam_height))
             img = Image.fromarray(frame_rgb)
             imgtk = ImageTk.PhotoImage(image=img)
@@ -188,11 +188,12 @@ class NewspaperApp:
             ret, frame = self.cap.read()
             if ret:
                 # 如果在倒计时中，就在画面上叠加倒计时数字
+                frame = cv2.flip(frame, 1)  # 添加镜像翻转
                 if self.countdown_value > 0:
                     text = str(self.countdown_value)
                     # 在画面上写倒计时数字（OpenCV方式）
                     cv2.putText(frame, text, 
-                                (int(self.cam_width/2 - 20), int(self.cam_height/2)), 
+                                (int(self.cam_width / 2 - 20), int(self.cam_height / 2)), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 
                                 2, (0, 0, 255), 5)
 
@@ -243,8 +244,9 @@ class NewspaperApp:
         """
         ret, frame = self.cap.read()
         if ret:
-            # 保存当前帧到内存
-            self.captured_frame = frame
+             # 保存当前帧到内存
+            frame = cv2.flip(frame, 1)  # 添加镜像翻转
+            self.captured_frame = cv2.flip(frame, 1)  # 添加镜像翻转
             # 也可以先行保存到文件
             cv2.imwrite("captured.jpg", frame)
             print("拍照完成，已保存到 captured.jpg")

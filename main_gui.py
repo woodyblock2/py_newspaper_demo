@@ -1,112 +1,12 @@
 import tkinter as tk
 import cv2
-import PIL
+import time
+import qrcode
 from PIL import Image, ImageTk
-import os
-import json
-import requests
-from datetime import datetime, timedelta
-from PIL import ImageDraw, ImageFont
-
-# ========== 以下是你已有的一些方法，可直接拷贝过来使用 ========== #
-WEATHER_API_KEY = "key" # 你的高德地图天气API Key
-WEATHER_CITY = "210202"
-LOCAL_WEATHER_JSON = "resource/weather_result.json"
-
-TEMPLATE_PATH = "resource/newspaper_template.png"
-FONT_PATH = "resource/msyh.ttc"  # 如果有别的路径，请自行改写
-
-def extract_weather_str(data_dict):
-    """
-    从接口或本地json数据中提取并拼接成 “晴 18℃” 形式
-    """
-    lives = data_dict.get("lives", [])
-    if not lives:
-        return "未知天气"
-    weather_desc = lives[0].get("weather", "未知")
-    temperature = lives[0].get("temperature","0")
-    return f"{weather_desc} {temperature}℃"
-
-def get_weather_info():
-    """
-    获取天气信息，逻辑与之前相同
-    """
-    local_data = None
-    if os.path.exists(LOCAL_WEATHER_JSON):
-        try:
-            with open(LOCAL_WEATHER_JSON, "r", encoding="utf-8") as f:
-                local_data = json.load(f)
-        except Exception as e:
-            print("读取本地 weather_result.json 失败：", e)
-            local_data = None
-
-    if local_data:
-        try:
-            lives_info = local_data["lives"][0]
-            report_time_str = lives_info["reporttime"]  # "2025-02-27 14:02:16"
-            report_time = datetime.strptime(report_time_str, "%Y-%m-%d %H:%M:%S")
-            if datetime.now() - report_time <= timedelta(hours=1):
-                print("本地天气数据未超过1小时，直接使用本地数据。")
-                return extract_weather_str(local_data)
-            else:
-                print("本地天气数据超过1小时，调用API更新。")
-        except Exception as e:
-            print("解析本地天气数据时出现异常，调用API更新:", e)
-    else:
-        print("未找到本地 weather_result.json，调用API获取最新数据。")
-
-    url = f"https://restapi.amap.com/v3/weather/weatherInfo?city={WEATHER_CITY}&key={WEATHER_API_KEY}"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("status") == "1" and "lives" in data and len(data["lives"]) > 0:
-                with open(LOCAL_WEATHER_JSON, "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False, indent=4)
-                return extract_weather_str(data)
-            else:
-                print("API返回数据异常，无法提取有效天气信息:", data)
-                return "晴 25℃"
-        else:
-            print("API请求失败，status_code:", response.status_code)
-            return "晴 25℃"
-    except Exception as e:
-        print("请求天气API出现错误:", e)
-        return "晴 25℃"
-
-def create_newspaper_image(photo_path, weather_str, output_path="final_newspaper.png"):
-    """
-    合成最终的报纸图片
-    """
-    template = Image.open(TEMPLATE_PATH).convert("RGB")
-    draw = ImageDraw.Draw(template)
-    user_photo = Image.open(photo_path).convert("RGB")
-
-    # 根据模板中用户照片需要的大小进行 resize
-    user_photo = user_photo.resize((448, 336))
-
-    # 将照片粘贴到模板上的指定位置 (需根据模板实际情况设置)
-    template.paste(user_photo, (210, 250))  # 假定 (210,250)
-
-    # 设置字体
-    if FONT_PATH and os.path.exists(FONT_PATH):
-        font = ImageFont.truetype(FONT_PATH, 15)
-    else:
-        font = ImageFont.load_default()
-
-    now_date = datetime.now()
-    date_str = f"{now_date.year}年{now_date.month}月{now_date.day}日"
-
-    # 左上角写日期和天气等文字
-    draw.text((5, 5), f"今日日期：{date_str}", font=font, fill=(0, 0, 0))
-    draw.text((300, 5), f"今日天气：{weather_str}", font=font, fill=(0, 0, 0))
-    draw.text((600, 5), "今日新闻,你登报了！", font=font, fill=(0, 0, 0))
-
-    template.save(output_path)
-    print(f"报纸图片已生成：{output_path}")
-    return output_path
-# ========== 以上是已有方法 ========== #
-
+from datetime import datetime
+from weather_utils import get_weather_info
+from image_utils import create_newspaper_image, TEMPLATE_PATH
+from pay_v3 import native_unified_order, native_query_order
 
 class NewspaperApp:
     def __init__(self, root):
@@ -145,14 +45,18 @@ class NewspaperApp:
         self.cam_label = tk.Label(self.bg_label)
         self.cam_label.place(x=self.cam_pos_x, y=self.cam_pos_y, width=self.cam_width, height=self.cam_height)
 
-        # 定义两个按钮——“拍照”、“退出”
+        # 按鈕 “支付”
+        self.btn_pay = tk.Button(self.root, text="支付", command=self.on_capture)
+        self.btn_pay.place(x=330, y=10, width=80, height=30)
+        # 按鈕 “拍照”
         self.btn_capture = tk.Button(self.root, text="拍照", command=self.on_capture)
-        self.btn_capture.place(x=400, y=10, width=80, height=30)
-
+        self.btn_capture.place(x=450, y=10, width=80, height=30)
+        # 按鈕 “打印”
         self.btn_print = tk.Button(self.root, text="打印", command=self.on_print)
-        self.btn_print.place(x=500, y=10, width=80, height=30)
+        self.btn_print.place(x=570, y=10, width=80, height=30)
 
-        # 初始时，“打印”按钮禁用
+        # 初始时，“拍照” “打印”按钮禁用
+        self.btn_capture["state"] = "disabled"
         self.btn_print["state"] = "disabled"
         # 天气信息（可提前获取并显示）
         self.weather_str = get_weather_info()
@@ -163,9 +67,15 @@ class NewspaperApp:
         self.is_freeze = False
         # 倒计时秒数，如果大于0则表示正在倒计时
         self.countdown_value = 0
-
         # 用于保存拍摄时的画面
         self.captured_frame = None
+
+        # 二维码Label
+        self.qr_label = tk.Label(self.root)
+        self.qr_label.place(x=650, y=50, width=200, height=200)
+        # 订单相关
+        self.current_trade_no = None
+        self.is_polling = False
 
         # 启动循环更新摄像头画面
         self.update_frame()
@@ -206,6 +116,69 @@ class NewspaperApp:
 
         # 递归调用自己
         self.root.after(50, self.update_frame)
+
+    def on_pay(self):
+        """
+        1。生成单号
+        2. 调用 V3 native 下单
+        3. 显示二维码
+        4. 开始轮询订单状态
+        """
+        self.is_polling = False
+        # 订单号
+        self.current_trade_no = datetime.now().strftime("%Y%m%d%H%M%S")
+        self.current_trade_no += str(int(time.time())) # 拼接时间戳
+
+        # 下单
+        code_url = native_unified_order(out_trade_no=self.current_trade_no,
+                                        total_fee=9.9,
+                                        description="报纸大头贴")
+        if not code_url:
+            print("下单失败，无法生成二维码")
+            return
+        
+        # 生成二维码
+        qr_img = qrcode.make(code_url)
+        qr_img.save("pay_qr.png")
+        # 显示到画面
+        qr_tk = ImageTk.PhotoImage(qr_img)
+        self.qr_label.config(image=qr_tk)
+        self.qr_label.image = qr_tk
+
+        # 开始轮询订单状态
+        self.is_polling = True
+        # self.po
+
+    def poll_payment_status(self):
+        """
+        轮询订单状态
+        """
+        if not self.is_polling:
+            return
+        state = native_query_order(self.current_trade_no)
+        if state == "SUCCESS":
+            print("用户支付成功!")
+            self.is_polling = False
+            # 清除二维码
+            self.qr_label.config(image=None)
+            self.qr_label.image = None
+            # 自动触发拍照
+            self.auto_capture_after_payment()
+        elif state in ["NOTPAY", "USERPAYING", None]:
+            # 继续轮询
+            self.root.after(2000, self.poll_payment_status)
+        else:
+            # 其他状态(CLOSED, PAYERROR等)
+            print("订单状态:", state, "停止轮询")
+            self.is_polling = False
+
+    def auto_capture_after_payment(self):
+        print("3秒后自动拍照!")
+        self.countdown_value = 3
+        self.btn_capture["state"] = "disabled"
+        self.btn_print["state"] = "disabled"
+        self.is_freeze = False
+        self.update_countdown()
 
     def on_capture(self):
         """

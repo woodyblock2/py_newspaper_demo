@@ -16,12 +16,11 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 # ========== 微信商户平台申请/配置的信息 ==========
 WECHATPAY_MCHID = "1900000001"
 WECHATPAY_APPID = "mock_appid"
-WECHATPAY_APIv3_KEY = "APIv3密钥"
+MERCHANT_CERT_SERIAL_NO = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 # 商户私钥路径 (pem)
-MERCHANT_PRIVATE_KEY_PATH = "resource/merchant_key.pem"
-# 微信支付平台证书(公钥)（用于回调验签，示例中仅做演示）
-WECHATPAY_CERT_PATH = "resource/wechatpay_cert.pem"
-MOCK_HOST = "http://127.0.0.1:8000"
+MERCHANT_PRIVATE_KEY_PATH = "resource/apiclient_key.pem"
+# MOCK_HOST = "http://127.0.0.1:8000"
+MOCK_HOST = "https://api.mch.weixin.qq.com"
 # ==================================================
 
 def load_merchant_private_key(key_path):
@@ -68,7 +67,6 @@ def native_unified_order(out_trade_no, total_fee, description="大头贴"):
     V3 Native 下单接口: POST /v3/pay/transactions/native
     """
     private_key = load_merchant_private_key(MERCHANT_PRIVATE_KEY_PATH)
-    merchant_cert_serial_no = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     url = f"{MOCK_HOST}/v3/pay/transactions/native"
 
     amount_dict = {
@@ -90,7 +88,7 @@ def native_unified_order(out_trade_no, total_fee, description="大头贴"):
         url="/v3/pay/transactions/native",
         body=body_str,
         mchid=WECHATPAY_MCHID,
-        serial_no=merchant_cert_serial_no,
+        serial_no=MERCHANT_CERT_SERIAL_NO,
         private_key=private_key
     )
 
@@ -115,18 +113,16 @@ def native_query_order(out_trade_no):
     V3 查询订单: GET /v3/pay/transactions/out-trade-no/{out_trade_no}?mchid=xxx
     """
     private_key = load_merchant_private_key(MERCHANT_PRIVATE_KEY_PATH)
-    merchant_cert_serial_no = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     path = f"/v3/pay/transactions/out-trade-no/{out_trade_no}?mchid={WECHATPAY_MCHID}"
     # url = "https://api.mch.weixin.qq.com" + path
     url = MOCK_HOST + path # TODO: 临时测试使用
-
 
     authorization = generate_authorization(
         method="GET",
         url=path,
         body="",
         mchid=WECHATPAY_MCHID,
-        serial_no=merchant_cert_serial_no,
+        serial_no=MERCHANT_CERT_SERIAL_NO,
         private_key=private_key
     )
     headers = {
@@ -143,3 +139,40 @@ def native_query_order(out_trade_no):
     except Exception as e:
         print("[PayV3] 查询订单接口异常:", e)
     return None
+
+def native_close_order(out_trade_no):
+    """
+    关闭订单接口：POST /v3/pay/transactions/out-trade-no/{out_trade_no}/close
+    请求体：{"mchid": "xxx"}
+    成功返回 True，否则返回 False
+    """
+    private_key = load_merchant_private_key(MERCHANT_PRIVATE_KEY_PATH)
+    path = f"/v3/pay/transactions/out-trade-no/{out_trade_no}/close"
+    # 测试时使用本地模拟服务器
+    url = MOCK_HOST + path
+    data = {
+        "mchid": WECHATPAY_MCHID
+    }
+    body_str = json.dumps(data, ensure_ascii=False)
+    authorization = generate_authorization(
+        method="POST",
+        url=path,
+        body=body_str,
+        mchid=WECHATPAY_MCHID,
+        serial_no=MERCHANT_CERT_SERIAL_NO,
+        private_key=private_key
+    )
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": authorization
+    }
+    try:
+        resp = requests.post(url, headers=headers, data=body_str, timeout=10)
+        if resp.status_code in [200, 204]:
+            print("[PayV3] 关闭订单成功")
+            return True
+        else:
+            print("[PayV3] 关闭订单接口返回非200/204:", resp.status_code, resp.text)
+    except Exception as e:
+        print("[PayV3] 请求关闭订单接口异常:", e)
+    return False

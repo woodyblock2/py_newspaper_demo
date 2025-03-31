@@ -5,17 +5,26 @@ import qrcode
 from PIL import Image, ImageTk
 from datetime import datetime
 from weather_utils import get_weather_info
-from image_utils import create_newspaper_image, TEMPLATE_PATH
+from image_utils import create_newspaper_image, load_template_config
 from pay_v3 import native_unified_order, native_query_order, native_close_order
 
 class NewspaperApp:
     def __init__(self, root):
         self.root = root
         self.root.title("今日登报 Demo")
+            # 读取模板位置信息
+        template_config = load_template_config("template1")
+        TEMPLATE_PATH = template_config["path"]
+        TEMPLATE_WIN_WIDTH = template_config["win_width"]
+        TEMPLATE_WIN_HEIGHT = template_config["win_height"]
+        TEMPLATE_CAM_WIDTH = template_config["cam_width"]
+        TEMPLATE_CAM_HEIGHT = template_config["cam_height"]
+        TEMPLATE_POS_X = template_config["cam_pos_x"]
+        TEMPLATE_POS_Y = template_config["cam_pos_y"]
 
         # 根据模板图设置窗口大小
-        self.WIN_WIDTH = 876
-        self.WIN_HEIGHT = 1072
+        self.WIN_WIDTH = TEMPLATE_WIN_WIDTH
+        self.WIN_HEIGHT = TEMPLATE_WIN_HEIGHT
         self.root.geometry(f"{self.WIN_WIDTH}x{self.WIN_HEIGHT}")
 
         # 打开摄像头
@@ -34,10 +43,10 @@ class NewspaperApp:
         self.bg_label.place(x=0, y=0, width=self.WIN_WIDTH, height=self.WIN_HEIGHT)
 
         # 摄像头预览区域尺寸及位置（根据模板确定）
-        self.cam_width = 448
-        self.cam_height = 336
-        self.cam_pos_x = 210
-        self.cam_pos_y = 250
+        self.cam_width = TEMPLATE_CAM_WIDTH
+        self.cam_height = TEMPLATE_CAM_HEIGHT
+        self.cam_pos_x = TEMPLATE_POS_X
+        self.cam_pos_y = TEMPLATE_POS_Y
 
         # 在背景上叠加一个 Label 用于显示摄像头实时画面
         self.cam_label = tk.Label(self.bg_label)

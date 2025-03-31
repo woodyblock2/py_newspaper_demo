@@ -1,24 +1,45 @@
 from PIL import Image
 import os
+import json
 from datetime import datetime
 from PIL import ImageDraw, ImageFont
 
-TEMPLATE_PATH = "resource/newspaper_template.png"
 FONT_PATH = "resource/msyh.ttc"  # 如有其他路径，请自行修改
+
+def load_template_config(template_name="template1", config_path="resource/template_config.json"):
+    """
+    通过template_config.json读取相应的模板
+    """
+    with open(config_path, "r", encoding="utf-8") as file:
+        config = json.load(file)
+    if template_name in config:
+        return config[template_name]
+    else:
+        raise ValueError(f"模板 {template_name} 不存在")
 
 def create_newspaper_image(photo_path, weather_str, output_path="final_newspaper.png"):
     """
     合成最终报纸图片，将用户照片与模板合成，并添加日期、天气等信息
     """
+    # 读取模板位置信息
+    template_config = load_template_config("template1")
+    TEMPLATE_PATH = template_config["path"]
+    # TEMPLATE_WIN_WIDTH = template_config["win_width"]
+    # TEMPLATE_WIN_HEIGHT = template_config["win_height"]
+    TEMPLATE_CAM_WIDTH = template_config["cam_width"]
+    TEMPLATE_CAM_HEIGHT = template_config["cam_height"]
+    TEMPLATE_POS_X = template_config["cam_pos_x"]
+    TEMPLATE_POS_Y = template_config["cam_pos_y"]
+
     template = Image.open(TEMPLATE_PATH).convert("RGB")
     draw = ImageDraw.Draw(template)
     user_photo = Image.open(photo_path).convert("RGB")
 
     # 根据模板要求调整照片尺寸
-    user_photo = user_photo.resize((448, 336))
+    user_photo = user_photo.resize((TEMPLATE_CAM_WIDTH, TEMPLATE_CAM_HEIGHT))
 
     # 将照片粘贴到模板上的指定位置（需根据模板实际情况设置）
-    template.paste(user_photo, (210, 250))  # 示例位置 (210,250)
+    template.paste(user_photo, (TEMPLATE_POS_X, TEMPLATE_POS_Y))  # 示例位置 (210,250)
 
     # 设置字体
     if FONT_PATH and os.path.exists(FONT_PATH):

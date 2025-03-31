@@ -4,11 +4,9 @@ import time
 import random
 import string
 import json
-import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import base64
-import hashlib
 
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -68,6 +66,8 @@ def native_unified_order(out_trade_no, total_fee, description="大头贴"):
     """
     private_key = load_merchant_private_key(MERCHANT_PRIVATE_KEY_PATH)
     url = f"{MOCK_HOST}/v3/pay/transactions/native"
+    # 计算订单过期时间，假设设置为60秒后
+    expire_time = (datetime.now() + timedelta(seconds=60)).strftime("%Y-%m-%dT%H:%M:%S+08:00")
 
     amount_dict = {
         "total": total_fee,
@@ -79,6 +79,7 @@ def native_unified_order(out_trade_no, total_fee, description="大头贴"):
         "description": description,
         "out_trade_no": out_trade_no,
         "notify_url": "https://www.example.com/wxpay/callback",
+        "time_expire": expire_time, # 追加过期时间字段
         "amount": amount_dict,
     }
     body_str = json.dumps(data, ensure_ascii=False)

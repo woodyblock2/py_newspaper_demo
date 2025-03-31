@@ -1,0 +1,32 @@
+{
+    "template1": {
+        "path": "resource/newspaper_template.png",
+        "win_width": 876,
+        "win_height": 1072,
+        "cam_width": 448,
+        "cam_height": 336,
+        "cam_pos_x": 210,
+        "cam_pos_y": 250,
+        "text_positions": {
+            "date": [5, 5],
+            "weather": [300, 5],
+            "headline": [600, 5]
+        },
+        "font_size": 15
+    },
+    "template2": {
+        "path": "resource/newspaper_template2.png",
+        "win_width": 1024,
+        "win_height": 768,
+        "cam_width": 500,
+        "cam_height": 375,
+        "cam_pos_x": 250,
+        "cam_pos_y": 300,
+        "text_positions": {
+            "date": [10, 10],
+            "weather": [350, 10],
+            "headline": [650, 10]
+        },
+        "font_size": 18
+    }
+}
